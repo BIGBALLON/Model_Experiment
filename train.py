@@ -7,364 +7,49 @@ import tensorflow as tf
 from keras import backend 
 from keras import backend as K
 from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import LearningRateScheduler, TensorBoard, ModelCheckpoint
 from keras.callbacks import Callback, CSVLogger
 from keras.models import Model
 from keras import optimizers
 from keras.layers import Input
+from our_callbacks import TensorBoardWithLr, LearningRateScheduler, ModelCheckpointWithEpoch
 
 sys.path.append("./models")
 if('tensorflow' == backend.backend()):
     import tensorflow as tf
     from keras.backend.tensorflow_backend import set_session
-
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
 
-class ModelCheckpointWithEpoch(Callback):
-    def __init__(self, filepath, monitor='val_loss', verbose=0,
-                 save_best_only=False, save_weights_only=False,
-                 mode='auto', period=1):
-        super(ModelCheckpointWithEpoch, self).__init__()
-        self.monitor = monitor
-        self.verbose = verbose
-        self.filepath = filepath
-        self.save_best_only = save_best_only
-        self.save_weights_only = save_weights_only
-        self.period = period
-        self.epochs_since_last_save = 0
-
-        if mode not in ['auto', 'min', 'max']:
-            warnings.warn('ModelCheckpoint mode %s is unknown, '
-                          'fallback to auto mode.' % (mode),
-                          RuntimeWarning)
-            mode = 'auto'
-
-        if mode == 'min':
-            self.monitor_op = np.less
-            self.best = np.Inf
-        elif mode == 'max':
-            self.monitor_op = np.greater
-            self.best = -np.Inf
-        else:
-            if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
-                self.monitor_op = np.greater
-                self.best = -np.Inf
-            else:
-                self.monitor_op = np.less
-                self.best = np.Inf
-
-    def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
-        self.epochs_since_last_save += 1
-        if self.epochs_since_last_save >= self.period:
-            self.epochs_since_last_save = 0
-            filepath = self.filepath.format(epoch=epoch + 1, **logs)
-            if self.save_best_only:
-                current = logs.get(self.monitor)
-                if current is None:
-                    warnings.warn('Can save best model only with %s available, '
-                                  'skipping.' % (self.monitor), RuntimeWarning)
-                else:
-                    if self.monitor_op(current, self.best):
-                        if self.verbose > 0:
-                            print('\nEpoch %05d: %s improved from %0.5f to %0.5f,'
-                                  ' saving model to %s'
-                                  % (epoch + 1, self.monitor, self.best,
-                                     current, filepath))
-                        self.best = current
-                        if self.save_weights_only:
-                            self.model.save_weights(filepath, overwrite=True)
-                        elif epoch > 100:
-                            self.model.save(filepath, overwrite=True)
-                    else:
-                        if self.verbose > 0:
-                            print('\nEpoch %05d: %s did not improve from %0.5f' %
-                                  (epoch + 1, self.monitor, self.best))
-            else:
-                if self.verbose > 0:
-                    print('\nEpoch %05d: saving model to %s' % (epoch + 1, filepath))
-                if self.save_weights_only:
-                    self.model.save_weights(filepath, overwrite=True)
-                else:
-                    self.model.save(filepath, overwrite=True)
-
-
-class TensorBoardWithLr(TensorBoard):
-    def __init__(self, log_dir='./logs',
-             histogram_freq=0,
-             batch_size=32,
-             write_graph=True,
-             write_grads=False,
-             write_images=False,
-             embeddings_freq=0,
-             embeddings_layer_names=None,
-             embeddings_metadata=None):
-        super(TensorBoardWithLr, self).__init__(log_dir,
-                                             histogram_freq,
-                                             batch_size,
-                                             write_graph,
-                                             write_grads,
-                                             write_images,
-                                             embeddings_freq,
-                                             embeddings_layer_names,
-                                             embeddings_metadata)
-
-
-    def on_train_begin(self, logs=None):
-        self.opt = self.model.optimizer
-        self.opt_name = type(self.opt).__name__
-        self.lr = self.opt.lr
-
-    def on_batch_end(self, batch, logs=None):
-        summary = tf.Summary()
-        summary_value = summary.value.add()
-        summary_value.simple_value = K.get_value(self.lr)
-        summary_value.tag = 'real_lr'
-        self.writer.add_summary(summary, K.get_value(self.opt.iterations))
-        self.writer.flush() 
-
-    def on_epoch_end(self, epoch, logs=None):
-        super(TensorBoardWithLr, self).on_epoch_end(epoch, logs)
-
-num_classes   = 10
-mean          = [125.3, 123.0, 113.9]
-std           = [62.9932, 62.0887, 66.7048]
-# older 
-# learning_rate = [0.05, 0.01, 0.001, 0.0001]
-# epoch_decay   = [0, 60, 120, 160, 300]
-learning_rate = [0.1, 0.01, 0.001]
-# epoch_decay   = [0, 100, 150, 300]
-epoch_decay   = [0, 81, 122, 300]
-start_lr      = learning_rate[0]
-end_lr        = 0.0
-method        = "tanh"
-methods       = ['step_decay', 'tanh_restart', 'cos_restart', 'linear', 'abs_sin', 'exponential', 'tanh_tanh_restart', 'cos_tanh', 'tanh_epoch', 'cos_epoch', 'cos_restart_tanhdecay', 'tanh_restart_tanhdecay', 'cos_iteration', 'tanh_iteration']
-log_path      = ""
-cosine_weight = 0.0
-epochs        = 0
-iterations    = 0
-batch_size    = 0
-
-img_rows      = 32
-img_cols      = 32
-img_channels  = 3
-
-class IterationLearningRateScheduler(Callback):
-    def __init__(self):
-        super(IterationLearningRateScheduler, self).__init__()
-        if (method in methods) == False:
-            print("[ERROR] no method ", method)
-            exit()
-        self.T_e    = 10.
-        self.T_mul  = 2.
-        self.T_next = self.T_e
-        self.tt     = 0
-
-
-    def on_train_begin(self, log=None):
-        self.opt = self.model.optimizer
-
-    def on_batch_end(self, batch, log):
-        lr = K.get_value(self.opt.lr)
-        iteration = K.get_value(self.opt.iterations)*1.
-        if method == "linear":
-            lr = start_lr + (end_lr-start_lr)*iteration/(iterations*epochs)
-
-        elif method == "abs_sin":
-            lr = start_lr*math.fabs( (iteration/(iterations*epochs) -1)*math.sin(2/((iteration/(iterations*epochs) -1))) )
-
-        elif method == 'tanh_tanh_restart':
-            dt = 1./(self.T_e*iterations)
-            self.tt = self.tt+dt
-            lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*self.tt - 4.)
-            lr = lr * (0.5 - 0.5 * math.tanh(8.*iteration/(iterations*epochs) - 4.))
-            
-        elif method == 'cos_tanh':
-            cos = (start_lr+end_lr)/2.+(start_lr-end_lr)/2.*math.cos(math.pi/2.*(iteration/(iterations*epochs/2.))) 
-            tanh = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-            lr = (cosine_weight*cos+(1-cosine_weight)*tanh)
-
-        elif method == "cos_iteration":
-            lr = (start_lr+end_lr)/2.+(start_lr-end_lr)/2.*math.cos(math.pi/2.*(iteration/(iterations*epochs/2.)))
-        elif method == 'tanh_iteration':
-            lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-        
-        elif method == 'cos_restart':
-            # cos without shift
-            dt = math.pi/float(self.T_e)
-            self.tt = self.tt+float(dt)/iterations
-            if self.tt >= math.pi:
-                self.tt = self.tt - math.pi
-            lr = end_lr + 0.5*(start_lr - end_lr)*(1+ math.cos(self.tt))
-        
-        elif method == 'tanh_restart':
-            # tanh restart
-            dt = 1./(self.T_e*iterations)
-            self.tt = self.tt+dt
-            lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*self.tt - 4.)
-        
-        # elif method == '1':
-        #     # cos shift +pi/2
-        #     dt = math.pi/float(self.T_e)
-        #     self.tt = self.tt+float(dt)/iterations
-        #     if self.tt >= math.pi:
-        #         self.tt = self.tt - math.pi
-        #     lr = end_lr +(start_lr - end_lr)*(1+ math.cos(self.tt + math.pi/2.))
-
-        # elif method == '2':
-        #     #  cos shift -pi/2
-        #     # bas since the final learning rate would be large
-        #     dt = math.pi/float(self.T_e)
-        #     self.tt = self.tt+float(dt)/iterations
-        #     if self.tt >= math.pi:
-        #         self.tt = self.tt - math.pi
-        #     lr = end_lr + (start_lr - end_lr)*(math.cos(self.tt - math.pi/2.))
-
-        elif method == 'cos_shift_restart_tanhdecay':
-            #  tanh as max and 0.1*tanh as min, multiply cos
-            max_lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-            min_lr = 0.1*max_lr
-            
-            dt = math.pi/float(self.T_e)
-            self.tt = self.tt+float(dt)/iterations
-            if self.tt >= math.pi:
-                self.tt = self.tt - math.pi
-            lr = min_lr + (max_lr - min_lr)*(math.cos(self.tt - math.pi/2.))
-
-        elif method == 'tanh_restart_tanhdecay':
-            #  tanh as max and 0.1*tanh as min, multiply tanh
-            max_lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-            min_lr = 0.1*max_lr
-            dt = 1./(self.T_e*iterations)
-            self.tt = self.tt+dt
-            lr = (max_lr+min_lr)/2. - (max_lr-min_lr)/2. * math.tanh(8.*self.tt - 4.)
-
-        elif method == 'cos_restart_tanhdecay':
-            #  tanh as max and 0.1*tanh as min, multiply cos
-            max_lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-            min_lr = 0.1*max_lr
-            
-            dt = math.pi/float(self.T_e)
-            self.tt = self.tt+float(dt)/iterations
-            if self.tt >= math.pi:
-                self.tt = self.tt - math.pi
-            lr = min_lr + 0.5*(max_lr - min_lr)*(1+ math.cos(self.tt))
-
-
-        # elif method == '5':
-        #     # cos shift +pi/2
-        #     #  tanh as max and 0.1*tanh as min, multiply cos
-        #     dt = math.pi/float(self.T_e)
-        #     self.tt = self.tt+float(dt)/iterations
-        #     if self.tt >= math.pi:
-        #         self.tt = self.tt - math.pi
-        #     max_lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-        #     min_lr = 0.1*max_lr
-        #     lr = min_lr +(max_lr - min_lr)*(1+ math.cos(self.tt + math.pi/2.))
-            
-        # elif method == '6':
-        #     #  cos shift -pi/2
-        #     #  tanh as max and 0.1*tanh as min, multiply cos
-        #     dt = math.pi/float(self.T_e)
-        #     self.tt = self.tt+float(dt)/iterations
-        #     if self.tt >= math.pi:
-        #         self.tt = self.tt - math.pi
-        #     max_lr = (start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.)
-        #     min_lr = 0.1*max_lr
-        #     lr = min_lr + (max_lr - min_lr)*(math.cos(self.tt - math.pi/2.))
-
-        # elif method == '7':
-        #     #  tanh restart
-        #     #  cos as max and 0.1*tanh as min, multiply cos
-        #     dt = 1./(self.T_e*iterations)
-        #     self.tt = self.tt+dt
-        #     max_lr = (start_lr+end_lr)/2.+(start_lr-end_lr)/2.*math.cos(math.pi/2.*(iteration/(iterations*epochs/2.)))
-        #     min_lr = 0.1*((start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.))
-        #     if max_lr < min_lr:
-        #         tmp_lr = max_lr
-        #         max_lr = min_lr
-        #         min_lr = tmp_lr
-        #     lr = (max_lr+min_lr)/2. - (max_lr-min_lr)/2. * math.tanh(8.*self.tt - 4.)
-        # elif method == '8':
-        #     #  cos shift pi/2
-        #     #  cos as max and 0.1*tanh as min, multiply cos
-        #     dt = math.pi/float(self.T_e)
-        #     self.tt = self.tt+float(dt)/iterations
-        #     if self.tt >= math.pi:
-        #         self.tt = self.tt - math.pi
-        #     max_lr = (start_lr+end_lr)/2.+(start_lr-end_lr)/2.*math.cos(math.pi/2.*(iteration/(iterations*epochs/2.)))
-        #     min_lr = 0.1*((start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.))
-        #     if max_lr < min_lr:
-        #         tmp_lr = max_lr
-        #         max_lr = min_lr
-        #         min_lr = tmp_lr
-        #     lr = min_lr + (max_lr - min_lr)*(1+math.cos(self.tt + math.pi/2.))
-        # elif method == '9':
-        #     #  cos shift -pi/2
-        #     #  cos as max and 0.1*tanh as min, multiply cos
-        #     dt = math.pi/float(self.T_e)
-        #     self.tt = self.tt+float(dt)/iterations
-        #     if self.tt >= math.pi:
-        #         self.tt = self.tt - math.pi
-        #     max_lr = (start_lr+end_lr)/2.+(start_lr-end_lr)/2.*math.cos(math.pi/2.*(iteration/(iterations*epochs/2.)))
-        #     min_lr = 0.1*((start_lr+end_lr)/2. - (start_lr-end_lr)/2. * math.tanh(8.*iteration/(iterations*epochs) - 4.))
-        #     if max_lr < min_lr:
-        #         tmp_lr = max_lr
-        #         max_lr = min_lr
-        #         min_lr = tmp_lr
-        #     lr = min_lr + (max_lr - min_lr)*(math.cos(self.tt - math.pi/2.))
-    
-        K.set_value(self.opt.lr, lr)
-
-    def on_epoch_end(self, epoch, log):
-        lr = K.get_value(self.opt.lr)
-        if method == "step_decay":
-            for i in range(len(epoch_decay)):
-                if epoch_decay[i] <= epoch < epoch_decay[i+1]:
-                    lr = learning_rate[i]
-        elif method == "exponential":
-            lr = start_lr*(0.98**epoch)
-        elif method == "cos_epoch":
-            lr = (start_lr+end_lr)/2.+(start_lr-end_lr)/2.*math.cos(math.pi/2.*(epoch/(epochs/2.)))
-        elif method == 'tanh_epoch':
-            start = -4.
-            end = 4.
-            lr = start_lr / 2. * ( 1- math.tanh( (end-start)*epoch/epochs + start))
-        K.set_value(self.opt.lr, lr)
-
-        if(epoch+1 == self.T_next):
-            self.tt = 0
-            self.T_e = self.T_e*self.T_mul
-            self.T_next = self.T_next + self.T_e
 
 def main(args):
-    
-    global batch_size
-    global epochs
-    global iterations
-    global method
-    global cosine_weight
-    global log_path
-    global num_classes
-    global epoch_decay
-    global learning_rate
-    global mean
-    global std
+
+    learning_rate_scheduler=[[0.1, 0.01, 0.001], [0, 81, 122, 300]]
+    img_rows      = 32
+    img_cols      = 32
+    img_channels  = 3
+    num_classes = 10
+    mean        = []
+    std         = []
 
     # load data
-    data_set = None
     if args.data_set == "cifar10":
         from keras.datasets import cifar10 as DataSet
         num_classes = 10
+        mean = [125.3, 123.0, 113.9]
+        std  = [62.9932, 62.0887, 66.7048]
     elif args.data_set == "cifar100":
         from keras.datasets import cifar100 as DataSet
         num_classes = 100
         mean = [129.3, 124.1, 112.4]
         std  = [68.2, 65.4, 70.4]
+    elif args.data_set =='fashion_mnist':
+        from keras.datasets import fashion_mnist as DataSet
+        num_classes = 10
+        mean = [72.94042]
+        std  = [90.02121]
     else:
-        print("[ERROR] No data set " , args.data_set)
+        print("[ERROR] No data set %s " % args.data_set)
         exit()
 
     (x_train, y_train), (x_test, y_test) = DataSet.load_data()
@@ -373,55 +58,49 @@ def main(args):
     x_train = x_train.astype('float32')
     x_test  = x_test.astype('float32')
 
-
-
-    batch_size    = args.batch_size
     epochs        = args.epochs
-    iterations    = (int)(math.ceil(len(x_train)*1. / batch_size))
-    method        = args.learning_rate_method
-    cosine_weight = args.cosine_constant
-    log_path      = args.log_path
+    iterations    = (int)(math.ceil(len(x_train)*1. / args.batch_size))
     
-    
-
-    if batch_size <= 0:
-        print("[ERROR] batch size cannot be %d" % batch_size)
+    if args.batch_size <= 0:
+        print("[ERROR] batch size cannot be %d" % args.batch_size)
         exit()
-    if epochs <= 0:
-        print("[ERROR] epochs cannot be %d" % epochs)
+    if args.epochs <= 0:
+        print("[ERROR] epochs cannot be %d" % args.epochs)
         exit()
 
+    if args.data_set=='fashion_mnist':
+        x_test = x_test.reshape((-1,28,28,1))
+        x_train = x_train.reshape((-1,28,28,1))
+        img_rows = 28
+        img_cols = 28
+        img_channels = 1
 
     # data preprocessing  [raw - mean / std]
-    for i in range(3):
-        x_train[:,:,:,i] = (x_train[:,:,:,i] - mean[i]) / std[i]
-        x_test[:,:,:,i] = (x_test[:,:,:,i] - mean[i]) / std[i]
+    for i in range(len(mean)):
+            x_train[:,:,:,i] = (x_train[:,:,:,i] - mean[i]) / std[i]
+            x_test[:,:,:,i] = (x_test[:,:,:,i] - mean[i]) / std[i]
 
     # build network
     img_input = Input(shape=(img_rows,img_cols,img_channels))
     output = None
     if args.network == "resnet":
         from ResNet import resnet as NetWork
-        output = NetWork(img_input,num_classes)
-
+        output = NetWork().build(img_input,num_classes, stack_n=args.network_depth)
     elif args.network == "wresnet":
         from WResNet import wresnet as NetWork
-        learning_rate = [0.1, 0.02, 0.004, 0.0008, 0.0001]
-        epoch_decay   = [0, 60, 120, 160, 300]
-        output = NetWork().build(img_input,num_classes)
-
-    elif args.network == "senet":
-        from SENet import senet as NetWork
-        output = NetWork(img_input,num_classes)
-
+        learning_rate_scheduler[0] = [0.1, 0.02, 0.004, 0.0008, 0.0001]
+        learning_rate_scheduler[1] = [0, 60, 120, 160, 300]
+        output = NetWork().build(img_input,num_classes, depth=args.network_depth, k=args.network_width)
     else:
         print("[ERROR] no network ", args.network)
         exit()
 
+    
+
     # use when the epochs are not 200
     # adjust the decay timing 
-    for i in range(len(epoch_decay)):
-        epoch_decay[i] = epoch_decay[i]*(epochs*1./200)
+    for i in range(len(learning_rate_scheduler[1])):
+        learning_rate_scheduler[1][i] = learning_rate_scheduler[1][i]*(args.epochs*1./200)
 
     model = Model(img_input, output)
 
@@ -440,14 +119,11 @@ def main(args):
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
     # set callback
-    tb_cb      = TensorBoardWithLr(log_dir=log_path, histogram_freq=0)
-    change_lr  = IterationLearningRateScheduler()
-    csv_logger = CSVLogger('./%s/training.csv' % log_path)
+    tb_cb      = TensorBoardWithLr(log_dir=args.log_path, histogram_freq=0)
+    change_lr  = LearningRateScheduler(args, iterations, learning_rate_scheduler)
+    csv_logger = CSVLogger('./%s/training.csv' % args.log_path)
     ckpt       = ModelCheckpointWithEpoch("%s/weights.{epoch:02d}-{val_acc:.4f}.hdf5" % args.log_path, monitor='val_acc', save_best_only=True)
-    if args.optimizer == 'adam':
-        cbks = [tb_cb, csv_logger, ckpt]
-    else:
-        cbks = [change_lr,tb_cb, csv_logger, ckpt]
+    cbks = [change_lr,tb_cb, csv_logger, ckpt]
 
     # using real-time data augmentation
     print('Using real-time data augmentation.')
@@ -456,18 +132,12 @@ def main(args):
 
     datagen.fit(x_train)
 
-    run_epochs = epochs
-    if method == 'tanh_epoch':
-        run_epochs += 50
-
     # start traing 
-    model.fit_generator(datagen.flow(x_train, y_train,batch_size=batch_size),
+    model.fit_generator(datagen.flow(x_train, y_train,batch_size=args.batch_size),
                         steps_per_epoch=iterations,
-                        epochs=run_epochs,
+                        epochs=args.epochs,
                         callbacks=cbks,
                         validation_data=(x_test, y_test))
-    # save model
-    # model.save('%s/weights.h5' % args.log_path)
 
 
 if __name__ == '__main__':
@@ -483,14 +153,20 @@ if __name__ == '__main__':
                     help='data set(default: cifar10)')
     parser.add_argument('-lr_m','--learning_rate_method', type=str, required=True, metavar='STRING',
                     help='learning rate method')
-    parser.add_argument('-sgdr_cur','--sgdr_curve', type=str, metavar='STRING',
-                    help='the type of curve when using sgdr')
-    parser.add_argument('-sc','--cosine_constant', type=float, default=0.5, metavar='FLOAT',
+    parser.add_argument('-sc','--cosine_weight', type=float, default=0.5, metavar='FLOAT',
                     help='cosine weight of cosine-tanh combination(default: 0.5)')
     parser.add_argument('-net','--network', type=str, required=True, metavar='STRING',
                     help='network architecture')
     parser.add_argument('-log','--log_path', type=str, required=True, metavar='STRING',
                     help='log path')
+    parser.add_argument('-depth','--network_depth', type=int, required=True, metavar='NUMBER',
+                    help='the depth of network')
+    parser.add_argument('-width','--network_width', type=int, default=1, metavar='NUMBER',
+                    help='the width of WRN')
+    parser.add_argument('-tanh_begin','--tanh_begin', type=float, default=-2.5, metavar='FLOAT',
+                    help='begin value of tanh (default: -2.5)')
+    parser.add_argument('-tanh_end','--tanh_end', type=float, default=2.5, metavar='FLOAT',
+                    help='end value of tanh (default: 2.5)')
 
     
     args = parser.parse_args()
