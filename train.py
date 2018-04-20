@@ -5,7 +5,6 @@ import keras
 import numpy as np
 import tensorflow as tf
 from keras import backend 
-from keras import backend as K
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import Callback, CSVLogger
 from keras.models import Model
@@ -15,24 +14,25 @@ from our_callbacks import TensorBoardWithLr, LearningRateScheduler, ModelCheckpo
 
 sys.path.append("./models")
 if('tensorflow' == backend.backend()):
-    import tensorflow as tf
     from keras.backend.tensorflow_backend import set_session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
 
-
 def main(args):
 
-    learning_rate_scheduler=[[0.1, 0.01, 0.001], [0, 81, 122, 300]]
+    learning_rate_scheduler = [[0.1, 0.01, 0.001], [0, 81, 122, 300]]
     img_rows      = 32
     img_cols      = 32
     img_channels  = 3
-    num_classes = 10
-    mean        = []
-    std         = []
+    num_classes   = 10
+    mean          = []
+    std           = []
 
     # load data
+    # support cifar10, cifar100, fashion mnist
+    # using meat/std data preprocessing method
+
     if args.data_set == "cifar10":
         from keras.datasets import cifar10 as DataSet
         num_classes = 10
@@ -58,8 +58,8 @@ def main(args):
     x_train = x_train.astype('float32')
     x_test  = x_test.astype('float32')
 
-    epochs        = args.epochs
-    iterations    = (int)(math.ceil(len(x_train)*1. / args.batch_size))
+    epochs      = args.epochs
+    iterations  = (int)(math.ceil(len(x_train)*1. / args.batch_size))
     
     if args.batch_size <= 0:
         print("[ERROR] batch size cannot be %d" % args.batch_size)
@@ -68,22 +68,29 @@ def main(args):
         print("[ERROR] epochs cannot be %d" % args.epochs)
         exit()
 
-    if args.data_set=='fashion_mnist':
-        x_test = x_test.reshape((-1,28,28,1))
-        x_train = x_train.reshape((-1,28,28,1))
-        img_rows = 28
-        img_cols = 28
+    if args.data_set == 'fashion_mnist':
+        img_rows     = 28
+        img_cols     = 28
         img_channels = 1
+        x_test = x_test.reshape((-1,img_rows,img_cols,img_channels))
+        x_train = x_train.reshape((-1,img_rows,img_cols,img_channels))
 
-    # data preprocessing  [raw - mean / std]
+    # do data preprocessing  [raw - mean / std]
     for i in range(len(mean)):
             x_train[:,:,:,i] = (x_train[:,:,:,i] - mean[i]) / std[i]
             x_test[:,:,:,i] = (x_test[:,:,:,i] - mean[i]) / std[i]
 
     # build network
+    # support LeNet, ResNet, ResNeXt
+
     img_input = Input(shape=(img_rows,img_cols,img_channels))
     output = None
-    if args.network == "resnet":
+    if args.network == "lenet":
+        from LeNet import lenet as NetWork
+        learning_rate_scheduler[0] = [0.025, 0.005, 0.0005]
+        learning_rate_scheduler[1] = [0, 81, 122, 300]
+        output = NetWork().build(img_input,num_classes)
+    elif args.network == "resnet":
         from ResNet import resnet as NetWork
         output = NetWork().build(img_input,num_classes, stack_n=args.network_depth)
     elif args.network == "wresnet":
@@ -95,10 +102,7 @@ def main(args):
         print("[ERROR] no network ", args.network)
         exit()
 
-    
-
-    # use when the epochs are not 200
-    # adjust the decay timing 
+    # adjust the decay timing (use when the epochs are not 200)
     for i in range(len(learning_rate_scheduler[1])):
         learning_rate_scheduler[1][i] = learning_rate_scheduler[1][i]*(args.epochs*1./200)
 
@@ -107,6 +111,7 @@ def main(args):
     print(model.summary())
 
     # set optimizer
+    # support SGD with momentum and Adam
     opt = None
     if args.optimizer == "sgd":
         opt = optimizers.SGD(lr=.1, momentum=0.9, nesterov=True)
@@ -123,12 +128,14 @@ def main(args):
     change_lr  = LearningRateScheduler(args, iterations, learning_rate_scheduler)
     csv_logger = CSVLogger('./%s/training.csv' % args.log_path)
     ckpt       = ModelCheckpointWithEpoch("%s/weights.{epoch:02d}-{val_acc:.4f}.hdf5" % args.log_path, monitor='val_acc', save_best_only=True)
-    cbks = [change_lr,tb_cb, csv_logger, ckpt]
+    cbks       = [change_lr,tb_cb, csv_logger, ckpt]
 
     # using real-time data augmentation
     print('Using real-time data augmentation.')
     datagen = ImageDataGenerator(horizontal_flip=True,
-            width_shift_range=0.125,height_shift_range=0.125,fill_mode='reflect')
+                                 width_shift_range=0.125,
+                                 height_shift_range=0.125,
+                                 fill_mode='reflect')
 
     datagen.fit(x_train)
 
@@ -138,7 +145,8 @@ def main(args):
                         epochs=args.epochs,
                         callbacks=cbks,
                         validation_data=(x_test, y_test))
-
+    # clear session
+    backend.clear_session()
 
 if __name__ == '__main__':
 
@@ -167,9 +175,9 @@ if __name__ == '__main__':
                     help='begin value of tanh (default: -2.5)')
     parser.add_argument('-tanh_end','--tanh_end', type=float, default=2.5, metavar='FLOAT',
                     help='end value of tanh (default: 2.5)')
-
     
     args = parser.parse_args()
+    print("\n=============== Argument ===============")
     print(args)
 
     main(args)

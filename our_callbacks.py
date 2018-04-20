@@ -139,7 +139,7 @@ class LearningRateScheduler(Callback):
         self.iterations=iterations
 
     def on_train_begin(self, log=None):
-    	print(self.model)
+        print(self.model)
         self.opt = self.model.optimizer
 
     def on_batch_end(self, batch, log):
@@ -210,8 +210,8 @@ class LearningRateScheduler(Callback):
         elif self.method == "cos_epoch":
             lr = (self.start_lr+self.end_lr)/2.+(self.start_lr-self.end_lr)/2.*math.cos(math.pi/2.*(epoch/(self.args.epochs/2.)))
         elif self.method == 'tanh_epoch':
-            start = -4.
-            end = 4.
+            start = self.args.tanh_begin
+            end = self.args.tanh_end
             lr = self.start_lr / 2. * ( 1- math.tanh( (end-start)*epoch/self.args.epochs + start))
         K.set_value(self.opt.lr, lr)
 
