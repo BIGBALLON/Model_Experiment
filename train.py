@@ -87,7 +87,7 @@ def main(args):
     output = None
     if args.network == "lenet":
         from LeNet import lenet as NetWork
-        learning_rate_scheduler[0] = [0.025, 0.005, 0.0005]
+        learning_rate_scheduler[0] = [0.05, 0.005, 0.0005]
         learning_rate_scheduler[1] = [0, 81, 122, 300]
         output = NetWork().build(img_input,num_classes)
     elif args.network == "resnet":
@@ -122,7 +122,6 @@ def main(args):
         exit()
 
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
-
     # set callback
     tb_cb      = TensorBoardWithLr(log_dir=args.log_path, histogram_freq=0)
     change_lr  = LearningRateScheduler(args, iterations, learning_rate_scheduler)
@@ -171,10 +170,10 @@ if __name__ == '__main__':
                     help='the depth of network')
     parser.add_argument('-width','--network_width', type=int, default=1, metavar='NUMBER',
                     help='the width of WRN')
-    parser.add_argument('-tanh_begin','--tanh_begin', type=float, default=-2.5, metavar='FLOAT',
-                    help='begin value of tanh (default: -2.5)')
-    parser.add_argument('-tanh_end','--tanh_end', type=float, default=2.5, metavar='FLOAT',
-                    help='end value of tanh (default: 2.5)')
+    parser.add_argument('-tanh_begin','--tanh_begin', type=float, default=-2., metavar='FLOAT',
+                    help='begin value of tanh (default: -2.0)')
+    parser.add_argument('-tanh_end','--tanh_end', type=float, default=2., metavar='FLOAT',
+                    help='end value of tanh (default: 2.0)')
     
     args = parser.parse_args()
     print("\n=============== Argument ===============")

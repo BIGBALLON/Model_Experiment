@@ -21,7 +21,7 @@ tanh_epoch cos_epoch cos_iteration tanh_iteration cos_tanh abs_sin)
 # 13 tanh_iteration
 # 14 cos_tanh
 # 15 abs_sin
-SchedulerListIndex=(0 10 11 12 13)
+SchedulerListIndex=(10)
 Depth=5
 Width=1
 BatchSize=128
@@ -30,48 +30,52 @@ Opt=sgd
 Net=lenet
 # Net = lenet or resnet or wresnet
 CosineConstant=0
-TanhBegin=-2
-TanhEnd=2
+TanhBegin=-2.
+TanhEnd=2.
 let depth=3*2*Depth+2
-for k in {0..2}; do
-	dataset="${Datasets[$k]^^}"
-	opt="${Opt^^}"
-	for j in ${SchedulerListIndex[*]};
-	do
-		outer_dir=${Net}
-		if [ "${Net}" != "lenet" ]; then
-			outer_dir+=_${depth}
-		fi
-		outer_dir+=_${dataset}_$opt_${LRSchedulerList[$j]}
-		
-		for i in {1..5}; 
-			do 
-			dir=${outer_dir}_$i
+for i in {1..5}; do 
+	for j in ${SchedulerListIndex[*]}; do
+		for k in {0..2}; do
+			dataset="${Datasets[$k]^^}"
+			opt="${Opt^^}"
+			outer_dir=${Net}
+			if [ "${Net}" != "lenet" ]; then
+				outer_dir+=_${depth}
+			fi
+			outer_dir+=_${dataset}_$opt_${LRSchedulerList[$j]}
+
+			
 			argument=" -b $BatchSize -e $Epochs -d ${Datasets[$k]} -o $Opt -lr_m 
-						${LRSchedulerList[$j]} -net ${Net} -depth $Depth -width $Width -log $dir "
+						${LRSchedulerList[$j]} -net ${Net} -depth $Depth -width $Width "
 			
 			if [ "${LRSchedulerList[$j]}" == "cos_tanh" ]; then
 				argument+=" -sc ${CosineConstant}"
 			fi
-			if [ "${LRSchedulerList[$j]}" == "tanh" ]; then
-				argument+=" -tanh_begin ${TanhBegin} -tanh_end ${TanhEnd}"
+			if [ "${LRSchedulerList[$j]}" == "tanh_epoch" ]; then
+				argument+=" -tanh_begin ${TanhBegin} -tanh_end ${TanhEnd} "
+				outer_dir+=_${TanhBegin}_${TanhEnd}
 			fi
+			
+			dir=${outer_dir}_$i
+			argument+="-log $dir "
+			
 
 			if [ -d "$dir" ]; then
 			  echo [ERROR] folder $dir already exists
 			else
 			  mkdir $dir
-			  cp run_net.sh *.py models $dir -r
-                          echo $argument
-			  CUDA_VISIBLE_DEVICES=0 python3 train.py $argument | tee $dir/log.log
+			  cp run_net.sh *.py models Pytorch_ResNeXt $dir -r
+              echo $argument
+			  CUDA_VISIBLE_DEVICES=0 python train.py $argument | tee $dir/log.log
 			fi
+			
+			# if [ -d "$outer_dir" ]; then
+			#   echo [ERROR] folder $dir already exists
+			# else
+			#   mkdir $outer_dir
+			#   mv ${outer_dir}_* $outer_dir
+			# fi	
 		done
-		
-		if [ -d "$outer_dir" ]; then
-		  echo [ERROR] folder $dir already exists
-		else
-		  mkdir $outer_dir
-		  mv ${outer_dir}_* $outer_dir
-		fi	
 	done
 done
+
