@@ -27,15 +27,15 @@ Width=1
 BatchSize=128
 Epochs=200
 Opt=sgd
-Net=lenet
+Net=resnet
 # Net = lenet or resnet or wresnet
 CosineConstant=0
-TanhBegin=-2.
-TanhEnd=2.
+TanhBegin=-2.0
+TanhEnd=2.0
 let depth=3*2*Depth+2
 for i in {1..5}; do 
 	for j in ${SchedulerListIndex[*]}; do
-		for k in {0..2}; do
+		for k in {2..2}; do
 			dataset="${Datasets[$k]^^}"
 			opt="${Opt^^}"
 			outer_dir=${Net}
