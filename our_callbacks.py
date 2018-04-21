@@ -142,7 +142,7 @@ class LearningRateScheduler(Callback):
         print(self.model)
         self.opt = self.model.optimizer
 
-    def on_batch_end(self, batch, log):
+    def on_batch_begin(self, batch, log):
         lr = K.get_value(self.opt.lr)
         iteration = K.get_value(self.opt.iterations)*1.
 
@@ -189,7 +189,7 @@ class LearningRateScheduler(Callback):
             lr = min_lr + 0.5*(max_lr - min_lr)*(1+ math.cos(self.tt))
         K.set_value(self.opt.lr, lr)
 
-    def on_epoch_end(self, epoch, log):
+    def on_epoch_begin(self, epoch, log):
         lr = K.get_value(self.opt.lr)
         if self.method == "step_decay":
             for i in range(len(self.learning_rate_scheduler[1])):
