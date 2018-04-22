@@ -16,7 +16,7 @@ learning_rate_scheduler_list = [
 class ModelCheckpointWithEpoch(Callback):
     def __init__(self, filepath, monitor='val_loss', verbose=0,
                  save_best_only=False, save_weights_only=False,
-                 mode='auto', period=1):
+                 mode='auto', period=1, save_begin_epoch=80):
         super(ModelCheckpointWithEpoch, self).__init__()
         self.monitor = monitor
         self.verbose = verbose
@@ -25,6 +25,7 @@ class ModelCheckpointWithEpoch(Callback):
         self.save_weights_only = save_weights_only
         self.period = period
         self.epochs_since_last_save = 0
+        self.save_begin_epoch = save_begin_epoch
 
         if mode not in ['auto', 'min', 'max']:
             warnings.warn('ModelCheckpoint mode %s is unknown, '
@@ -67,7 +68,7 @@ class ModelCheckpointWithEpoch(Callback):
                         self.best = current
                         if self.save_weights_only:
                             self.model.save_weights(filepath, overwrite=True)
-                        elif epoch > 100:
+                        elif epoch > self.save_begin_epoch:
                             self.model.save(filepath, overwrite=True)
                     else:
                         if self.verbose > 0:
@@ -139,7 +140,6 @@ class LearningRateScheduler(Callback):
         self.iterations=iterations
 
     def on_train_begin(self, log=None):
-        print(self.model)
         self.opt = self.model.optimizer
 
     def on_batch_begin(self, batch, log):
