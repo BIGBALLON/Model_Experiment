@@ -32,13 +32,14 @@ Net=resnet
 CosineConstant=0
 TanhBegin=-2.0
 TanhEnd=2.0
-FirstLrEpochNum=(40 60 80 100 120 140 160 )
+# FirstLrEpochNum=(40 60 80 100 120 140 160 )
+FirstLrEpochNum=(40 160 )
 # SecondLrEpochNum=(40 60 80 100 120 140 160 )
 SecondLrEpochNum=(160 )
 let depth=3*2*Depth+2
 for first_eopch in ${FirstLrEpochNum[*]}; do
 	for second_epoch in ${SecondLrEpochNum[*]}; do
-		for i in {1..1}; do 
+		for i in {1..4}; do 
 			for j in ${SchedulerListIndex[*]}; do
 				for k in {0..0}; do
 					dataset="${Datasets[$k]^^}"
