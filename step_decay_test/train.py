@@ -63,7 +63,6 @@ def main(args):
 
     epochs = args.first_lr_epoch_num + args.second_lr_epoch_num
     iterations  = (int)(math.ceil(len(x_train)*1. / args.batch_size))
-    iterations = 1
     
     if args.batch_size <= 0:
     	print("[ERROR] batch size %d <= 0 " % args.data_set)
