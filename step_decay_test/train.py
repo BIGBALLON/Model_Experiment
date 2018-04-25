@@ -61,7 +61,7 @@ def main(args):
     x_train = x_train.astype('float32')
     x_test  = x_test.astype('float32')
 
-    epochs = args.first_lr_epoch_num + args.second_lr_epoch_num
+    epochs = args.first_lr_epoch_num + args.second_lr_epoch_num + +args.third_lr_epoch_num;
     iterations  = (int)(math.ceil(len(x_train)*1. / args.batch_size))
     
     if args.batch_size <= 0:
@@ -93,8 +93,8 @@ def main(args):
     elif args.network == "resnet":
         from ResNet import resnet as NetWork
         output = NetWork().build(img_input,num_classes, stack_n=args.network_depth)
-        learning_rate_scheduler[0] = [0.1, 0.01]
-        learning_rate_scheduler[1] = [0, args.first_lr_epoch_num, 100000]
+        learning_rate_scheduler[0] = [0.1, 0.01, 0.001]
+        learning_rate_scheduler[1] = [0, args.first_lr_epoch_num, args.second_lr_epoch_num+args.first_lr_epoch_num, 100000]
     elif args.network == "wresnet":
         from WResNet import wresnet as NetWork
         learning_rate_scheduler[0] = [0.1, 0.02, 0.004, 0.0008, 0.0001]
@@ -168,11 +168,13 @@ if __name__ == '__main__':
                     help='the depth of network')
     parser.add_argument('-width','--network_width', type=int, default=1, metavar='NUMBER',
                     help='the width of WRN')
-    parser.add_argument('-E1','--first_lr_epoch_num', type=int, required=True, metavar='STRING',
+    parser.add_argument('-E1','--first_lr_epoch_num', type=int, required=True, metavar='NUMBER',
                     help='number of epoch to train on learning rate 0.1')
-    parser.add_argument('-E2','--second_lr_epoch_num', type=int, required=True, metavar='STRING',
+    parser.add_argument('-E2','--second_lr_epoch_num', type=int, required=True, metavar='NUMBER',
                     help='number of epoch to train on learning rate 0.01')
-    
+    parser.add_argument('-E3','--third_lr_epoch_num', type=int, required=True, metavar='NUMBER',
+                    help='number of epoch to train on learning rate 0.001')
+   
     args = parser.parse_args()
     print("\n=============== Argument ===============")
     print(args)
