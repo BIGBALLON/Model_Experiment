@@ -61,7 +61,7 @@ def main(args):
     x_train = x_train.astype('float32')
     x_test  = x_test.astype('float32')
 
-    epochs = args.first_lr_epoch_num + args.second_lr_epoch_num + +args.third_lr_epoch_num;
+    epochs = args.first_lr_epoch_num + args.second_lr_epoch_num + args.third_lr_epoch_num;
     iterations  = (int)(math.ceil(len(x_train)*1. / args.batch_size))
     
     if args.batch_size <= 0:

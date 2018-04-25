@@ -41,7 +41,7 @@ let depth=3*2*Depth+2
 for first_eopch in ${FirstLrEpochNum[*]}; do
 	for second_epoch in ${SecondLrEpochNum[*]}; do
 		for third_epoch in ${ThirdLrEpochNum[*]}; do
-			for i in {1..1}; do 
+			for i in {1..4}; do 
 				for j in ${SchedulerListIndex[*]}; do
 					for k in {0..0}; do
 						dataset="${Datasets[$k]^^}"
