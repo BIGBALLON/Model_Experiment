@@ -37,7 +37,7 @@ def main(args):
         from keras.datasets import cifar10 as DataSet
         num_classes = 10
         mean = [125.3, 123.0, 113.9]
-        std  = [62.9932, 62.0887, 66.7048]
+        std  = [63.0, 62.1, 66.7]
     elif args.data_set == "cifar100":
         from keras.datasets import cifar100 as DataSet
         num_classes = 100
