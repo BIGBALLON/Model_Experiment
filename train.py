@@ -21,6 +21,8 @@ if('tensorflow' == backend.backend()):
 
 def main(args):
 
+
+
     learning_rate_scheduler = [[0.1, 0.01, 0.001], [0, 81, 122, 300]]
     img_rows      = 32
     img_cols      = 32
@@ -122,6 +124,8 @@ def main(args):
         exit()
 
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+
     # set callback
     tb_cb      = TensorBoardWithLr(log_dir=args.log_path, histogram_freq=0)
     change_lr  = LearningRateScheduler(args, iterations, learning_rate_scheduler)
@@ -137,6 +141,10 @@ def main(args):
                                  fill_mode='reflect')
 
     datagen.fit(x_train)
+
+    if(args.weight_number != ""):
+    	model.load_weights('resnet-32-initial-weight/weight_%s' % args.weight_number)
+    	print("[INFO] Using initial weight: weight_%s" % args.weight_number)
 
     # start traing 
     model.fit_generator(datagen.flow(x_train, y_train,batch_size=args.batch_size),
@@ -174,6 +182,8 @@ if __name__ == '__main__':
                     help='begin value of tanh (default: -2.0)')
     parser.add_argument('-tanh_end','--tanh_end', type=float, default=2., metavar='FLOAT',
                     help='end value of tanh (default: 2.0)')
+    parser.add_argument('-weight_number','--weight_number', type=str, default="", metavar='STRING',
+                    help='the weight number of initial weight (default: null)')
     
     args = parser.parse_args()
     print("\n=============== Argument ===============")
