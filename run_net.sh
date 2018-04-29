@@ -21,7 +21,7 @@ tanh_epoch cos_epoch cos_iteration tanh_iteration cos_tanh abs_sin)
 # 13 tanh_iteration
 # 14 cos_tanh
 # 15 abs_sin
-SchedulerListIndex=(10)
+SchedulerListIndex=(0)
 Depth=5
 Width=1
 BatchSize=128
@@ -46,7 +46,7 @@ for i in {1..5}; do
 
 			
 			argument=" -b $BatchSize -e $Epochs -d ${Datasets[$k]} -o $Opt -lr_m 
-						${LRSchedulerList[$j]} -net ${Net} -depth $Depth -width $Width -weight_number ${i}"
+						${LRSchedulerList[$j]} -net ${Net} -depth $Depth -width $Width -weight_number ${i} "
 			
 			if [ "${LRSchedulerList[$j]}" == "cos_tanh" ]; then
 				argument+=" -sc ${CosineConstant}"
