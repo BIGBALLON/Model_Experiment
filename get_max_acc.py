@@ -6,7 +6,7 @@ def get_values(rootDir):
     list_dirs = os.walk(rootDir) 
     for root, dirs, files in list_dirs: 
         name = root.split("/")[1]
-        if name not in li and "Net" in name:
+        if name not in li and ("net" in name or "Net" in name):
             print("")
             print(name,end=",") 
             li.append(root.split("/")[1])

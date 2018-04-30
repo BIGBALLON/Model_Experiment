@@ -35,7 +35,7 @@ TanhEnd=2.0
 let depth=3*2*Depth+2
 for i in {1..5}; do 
 	for j in ${SchedulerListIndex[*]}; do
-		for k in {1..1}; do
+		for k in {2..2}; do
 			dataset="${Datasets[$k]^^}"
 			opt="${Opt^^}"
 			outer_dir=${Net}
