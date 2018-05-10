@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-Datasets=(cifar10 cifar100 fashion_mnist)
+Datasets=(cifar10 cifar100 fashion_mnist tiny_imagenet)
 LRSchedulerList=(step_decay step_decay_two step_decay_three 
 exponential linear constant
 tanh_restart cos_restart cos_restart_tanhdecay tanh_restart_tanhdecay
@@ -21,8 +21,8 @@ tanh_epoch cos_epoch cos_iteration tanh_iteration cos_tanh abs_sin)
 # 13 tanh_iteration
 # 14 cos_tanh
 # 15 abs_sin
-SchedulerListIndex=(0)
-Depth=5
+SchedulerListIndex=(0 10 11)
+Depth=18
 Width=1
 BatchSize=128
 Epochs=200
@@ -30,12 +30,12 @@ Opt=sgd
 Net=resnet
 # Net = lenet or resnet or wresnet
 CosineConstant=0
-TanhBegin=-2.0
-TanhEnd=2.0
+TanhBegin=-4.0
+TanhEnd=4.0
 let depth=3*2*Depth+2
 for i in {1..5}; do 
 	for j in ${SchedulerListIndex[*]}; do
-		for k in {2..2}; do
+		for k in {3..3}; do
 			dataset="${Datasets[$k]^^}"
 			opt="${Opt^^}"
 			outer_dir=${Net}
@@ -46,7 +46,7 @@ for i in {1..5}; do
 
 			
 			argument=" -b $BatchSize -e $Epochs -d ${Datasets[$k]} -o $Opt -lr_m 
-						${LRSchedulerList[$j]} -net ${Net} -depth $Depth -width $Width -weight_number ${i} "
+						${LRSchedulerList[$j]} -net ${Net} -depth $Depth -width $Width "
 			
 			if [ "${LRSchedulerList[$j]}" == "cos_tanh" ]; then
 				argument+=" -sc ${CosineConstant}"
@@ -64,9 +64,9 @@ for i in {1..5}; do
 			  echo [ERROR] folder $dir already exists
 			else
 			  mkdir $dir
-			  cp run_net.sh *.py models Pytorch_ResNeXt $dir -r
+			  # cp run_net.sh *.py models Pytorch_ResNeXt $dir -r
               echo $argument
-			  CUDA_VISIBLE_DEVICES=0 python train.py $argument | tee $dir/log.log
+			  CUDA_VISIBLE_DEVICES=0 python3 train.py $argument | tee $dir/log.log
 			fi
 			
 			# if [ -d "$outer_dir" ]; then
