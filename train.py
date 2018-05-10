@@ -21,8 +21,6 @@ if('tensorflow' == backend.backend()):
 
 def main(args):
 
-
-
     learning_rate_scheduler = [[0.1, 0.01, 0.001], [0, 81, 122, 300]]
     img_rows      = 32
     img_cols      = 32
@@ -32,36 +30,54 @@ def main(args):
     std           = []
 
     # load data
-    # support cifar10, cifar100, fashion mnist
+    # support cifar10, cifar100, fashion mnist and Tiny ImageNet
     # using meat/std data preprocessing method
 
-    if args.data_set == "cifar10":
+    if args.data_set == 'cifar10':
         from keras.datasets import cifar10 as DataSet
         num_classes = 10
         mean = [125.3, 123.0, 113.9]
         std  = [63.0, 62.1, 66.7]
-    elif args.data_set == "cifar100":
+    elif args.data_set == 'cifar100':
         from keras.datasets import cifar100 as DataSet
         num_classes = 100
         mean = [129.3, 124.1, 112.4]
         std  = [68.2, 65.4, 70.4]
-    elif args.data_set =='fashion_mnist':
+    elif args.data_set == 'fashion_mnist':
         from keras.datasets import fashion_mnist as DataSet
         num_classes = 10
         mean = [72.94042]
         std  = [90.02121]
+    elif args.data_set == 'tiny_imagenet':
+        num_classes = 200
+        # mean & std for 64 x 64 size
+        # mean = [112.8, 113.1, 113.1]
+        # std  = [74.1, 73.3, 72.9]
+
+        # mean & std for 32 x 32 size
+        mean = [122.4, 114.3, 101.4]
+        std  = [67.2, 65.0, 68.6]
     else:
         print("[ERROR] No data set %s " % args.data_set)
         exit()
 
-    (x_train, y_train), (x_test, y_test) = DataSet.load_data()
+    if args.data_set == 'tiny_imagenet':
+        import six.moves.cPickle as pickle
+        x = pickle.load(open( "tiny_imagenet.pkl", "rb" ))
+        x_train = x['train']['data']
+        y_train = x['train']['target']
+        x_test  = x['val']['data']
+        y_test  = x['val']['target']
+    else:
+        (x_train, y_train), (x_test, y_test) = DataSet.load_data()
+
     y_train = keras.utils.to_categorical(y_train, num_classes)
     y_test  = keras.utils.to_categorical(y_test, num_classes)
     x_train = x_train.astype('float32')
     x_test  = x_test.astype('float32')
 
     epochs      = args.epochs
-    iterations  = (int)(math.ceil(len(x_train)*1. / args.batch_size))
+    iterations  = (int)(math.ceil(len(x_train)*1.0 / args.batch_size))
     
     if args.batch_size <= 0:
         print("[ERROR] batch size cannot be %d" % args.batch_size)
@@ -76,6 +92,13 @@ def main(args):
         img_channels = 1
         x_test = x_test.reshape((-1,img_rows,img_cols,img_channels))
         x_train = x_train.reshape((-1,img_rows,img_cols,img_channels))
+    elif args.data_set == 'tiny_imagenet':
+        # img_rows     = 64
+        # img_cols     = 64
+        # resize to 32 x 32
+        img_rows     = 32
+        img_cols     = 32
+        img_channels = 3
 
     # do data preprocessing  [raw - mean / std]
     for i in range(len(mean)):
@@ -143,8 +166,8 @@ def main(args):
     datagen.fit(x_train)
 
     if(args.weight_number != ""):
-    	model.load_weights('resnet-32-%s-initial-weight/weight_%s' % (args.data_set, args.weight_number))
-    	print("[INFO] Using initial weight: %s weight_%s" % (args.data_set, args.weight_number))
+        model.load_weights('resnet-32-%s-initial-weight/weight_%s' % (args.data_set, args.weight_number))
+        print("[INFO] Using initial weight: %s weight_%s" % (args.data_set, args.weight_number))
 
     # start traing 
     model.fit_generator(datagen.flow(x_train, y_train,batch_size=args.batch_size),
